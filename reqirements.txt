@@ -1,4 +1,4 @@
-plotly
+plotly.express
 pandas
 streamlit
 seaborn
