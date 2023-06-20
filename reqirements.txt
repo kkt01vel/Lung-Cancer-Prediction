@@ -1,4 +1,4 @@
-plotly.express==5.9.0
+plotly-express==0.4.1
 pandas==1.5.3
 streamlit==1.23.1
 seaborn==0.12.2
