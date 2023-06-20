@@ -4,10 +4,12 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import seaborn as sns
-
+import pybase64
 sns.set()
-px.defaults.width = 800
+px.defaults.width = 900
 px.defaults.height = 500
+
+df1 = pd.read_csv("E:/raw_data.csv")
 
 # Functions Exploratory Analysis
 class EDA:
@@ -26,16 +28,7 @@ class EDA:
     def scatter_plot(self, col_x,col_y,hue=None, size=None):
         return px.scatter(self.df, x=col_x, y=col_y, color=hue,size=size)
 
-    def bar_plot(self, col_y, col_x, hue=None):
-        return px.bar(self.df, x=col_x, y=col_y,color=hue)
-        
-      
-    def heatmap_vars(self,cols, func = np.mean):
-        sns.set(style="whitegrid")
-        sns.set(font_scale=0.6)
-        chart = sns.heatmap(self.df.pivot_table(index =cols[0], columns =cols[1],  values =cols[2], aggfunc=func, fill_value=0).dropna(axis=1), annot=True, annot_kws={"size": 7}, linewidths=.5)
-        return chart.set_xticklabels(chart.get_xticklabels(), rotation=30)
-
+    
     def Corr(self, cols=None, method = 'pearson'):
         sns.set(style="whitegrid")
         sns.set(font_scale=0.6)
@@ -48,6 +41,36 @@ class EDA:
         chart.set_yticklabels(chart.get_yticklabels(), rotation=30)
         return chart
    
+
+
+@st.cache
+def get_na_info(df_preproc, df, col):
+    raw_info = pd_of_stats(df, col)
+    prep_info = pd_of_stats(df_preproc,col)
+    return raw_info.join(prep_info, lsuffix= '_raw', rsuffix='_prep').T
+
+@st.cache     
+def pd_of_stats(df,col):
+    #Descriptive Statistics
+    stats = dict()
+    stats['Mean']  = df[col].mean()
+    stats['Std']   = df[col].std()
+    stats['Var'] = df[col].var()
+    stats['Kurtosis'] = df[col].kurtosis()
+    stats['Skewness'] = df[col].skew()
+    stats['Coefficient Variance'] = stats['Std'] / stats['Mean']
+    return pd.DataFrame(stats, index = col).T.round(2)
+
+@st.cache   
+def pf_of_info(df,col):
+    info = dict()
+    info['Type'] =  df[col].dtypes
+    info['Unique'] = df[col].nunique()
+    info['n_zeros'] = (len(df) - np.count_nonzero(df[col]))
+    info['p_zeros'] = round(info['n_zeros'] * 100 / len(df),2)
+    info['nan'] = df[col].isna().sum()
+    info['p_nan'] =  (df[col].isna().sum() / df.shape[0]) * 100
+    return pd.DataFrame(info, index = col).T.round(2)
     
    
 
@@ -63,43 +86,17 @@ def get_stats(df):
 
 @st.cache
 def get_info(df):
-    return pd.DataFrame({'types': df.dtypes, 'nan': df.isna().sum(), 'nan%': round((df.isna().sum()/len(df))*100,2), 'unique':df.nunique()})
-
-
+    return pd.DataFrame({'types': df.dtypes, 'nan': df.isna().sum(), 'nan%': round((df.isna().sum()/len(df))*100,2)})
 
 
 def plot_multivariate(obj_plot, radio_plot):
 
-     
-
-    def pretty(method):
-        return method.capitalize()
-
-    if radio_plot == ('Correlation'):
-        st.subheader('Heatmap Correlation Plot')
-        correlation = st.sidebar.selectbox("Choose the correlation method", ('pearson', 'kendall','spearman'), format_func=pretty)
-        cols_list = st.sidebar.multiselect("Select columns",obj_plot.columns)
-        st.sidebar.markdown("If None selected, it will plot the correlation of all numeric variables.")
-        if st.sidebar.button('Plot correlation chart'):
-            fig = obj_plot.Corr(cols_list, correlation)
-            st.pyplot()
-        st.set_option('deprecation.showPyplotGlobalUse', False)
-
+        
     def map_func(function):
         dic = {np.mean:'Mean', np.sum:'Sum', np.median:'Median'}
         return dic[function]
     
-    if radio_plot == ('Heatmap'):
-        st.subheader('Heatmap between vars')
-        st.markdown(" In order to plot this chart remember that the order of the selection matters, \
-            chooose in order the variables that will build the pivot table: row, column and value.")
-        cols_list = st.sidebar.multiselect("Select 3 variables (2 categorical and 1 numeric)",obj_plot.columns, key= 'heatmapvars')
-        agg_func = st.sidebar.selectbox("Choose one function to aggregate the data", (np.mean, np.sum, np.median), format_func=map_func)
-        if st.sidebar.button('Plot heatmap between vars'):
-            fig = obj_plot.heatmap_vars(cols_list, agg_func)
-            st.pyplot()
-        st.set_option('deprecation.showPyplotGlobalUse', False)
-    
+        
     if radio_plot == ('Histogram'):
         st.subheader('Histogram')
         col_hist = st.sidebar.selectbox("Choose main variable", obj_plot.num_vars)
@@ -124,70 +121,130 @@ def plot_multivariate(obj_plot, radio_plot):
         st.set_option('deprecation.showPyplotGlobalUse', False)
    
     
-    if radio_plot == ('Barplot'):
-        st.subheader('Barplot') 
-        col_y = st.sidebar.selectbox("Choose main variable (numerical)",obj_plot.num_vars, key='barplot1')
-        col_x = st.sidebar.selectbox("Choose x variable (categorical)", obj_plot.columns,key='barplot2')
-        hue_opt = st.sidebar.selectbox("Hue (categorical/numerical) optional", obj_plot.columns.insert(0,None),key='barplot')
-        if st.sidebar.button('Plot barplot chart'):
-            st.plotly_chart(obj_plot.bar_plot(col_y,col_x, hue_opt))
-        st.set_option('deprecation.showPyplotGlobalUse', False)
-   
-    
+
 def main():
 
-    st.title('Lung Cancer Prediction ')
+    st.title('Lung Cancer Prediction :bar_chart:')
     
    
         
-    df = pd.read_csv("C:/Users/DELL/Downloads/cancer patient data sets_1.csv")
+    df = pd.read_csv('E:/Clean_data.csv')
+    
 
    
     def basic_info(df):
-            st.header("Data")
-            st.write('Number of observations', df.shape[0]) 
-            st.write('Number of variables', df.shape[1])
-            st.write('Number of missing (%)',((df.isna().sum().sum()/df.size)*100).round(2))
-
+            left_column, middle_column, right_column = st.columns(3)
+            with left_column:
+                st.subheader('Total Number of observations')
+                st.subheader(df.shape[0])
+            with middle_column:
+                st.subheader("Total Number of variables")
+                st.subheader(df.shape[1])
+            with right_column:
+                st.subheader("Number of missing variables in percentage ")
+                st.subheader(((df.isna().sum().sum()/df.size)*100).round(2))
+            
         #Visualize data
     basic_info(df)
         
         #Sidebar Menu
-    options = ["Summary statistics", "Analysis and Visualization"]
+    options = ["Raw Dataset","Clean Dataset","Descriptive Statistics","Insights about the data", "Analysis","Visualization"]
     menu = st.sidebar.selectbox("Menu options", options)
 
         #Data statistics
+    df1_info = get_info(df1)    
     df_info = get_info(df)   
-    if (menu == "Summary statistics"):
+    if (menu == "Insights about the data"):
         df_stat_num, df_stat_obj = get_stats(df)
+        st.header("Information about the dataset")
         st.markdown('**Numerical summary**')
         st.table(df_stat_num)
         st.markdown('**Categorical summary**')
         st.table(df_stat_obj)
-        st.markdown('**Missing Values**')
-        st.table(df_info)
+        st.sidebar.title('**Statistical Sumary**')
 
     eda_plot = EDA(df) 
 
         # Visualize data
+   
+    if (menu =="Visualization" ):
+        st.sidebar.title('**Visualization of Lung Cancer Prediction dataset**')
+        st.header("Visualization")
 
-       
-
-    if (menu =="Analysis and Visualization" ):
-        st.header("Analysis and Visualization")
-
-        st.markdown('Here you can visualize your data by choosing one of the chart options available on the sidebar!')
+        st.markdown('User can visualize different variables using the options given in sidebar')
                
-        st.sidebar.subheader('Data visualization options')
-        radio_plot = st.sidebar.radio('Choose plot style', ('Correlation', 'Heatmap', 'Histogram', \
-                'Scatterplot', 'Barplot'))
+        st.sidebar.subheader('**Data visualization options**')
+        radio_plot = st.sidebar.radio('Choose plot style', ('Histogram','Scatterplot'))
 
         plot_multivariate(eda_plot, radio_plot)
 
+    
+    if (menu == "Raw Dataset"):
+       st.sidebar.title('Raw Dataset') 
+       st.header("Raw Dataset given for analysis")
+       st.dataframe(data=df1, width=None, height=None)
+       st.table(df1_info)
+       
+       
+    if (menu == "Clean Dataset"):
+       st.sidebar.title('After Cleaning')
+       st.header("Dataset after cleaning")
+       st.dataframe(df.style.highlight_max(axis=0),width=None, height=None)
+       st.table(df_info)
+       
+    if (menu =="Analysis" ):
+        st.sidebar.title('Correlation Analysis')
+        st.header("Correlation between variables")
+        st.markdown('User can correlate different variables using the options given in sidebar')
+        st.sidebar.subheader('**Correlation between variables**')
+        st.subheader('Heatmap Correlation Plot')
+        correlation = st.sidebar.selectbox("Choose the correlation method", ('pearson', 'kendall','spearman'))
+        cols_list = st.sidebar.multiselect("Select columns",eda_plot.columns)
+        st.sidebar.markdown("If None selected, it will plot the correlation of all numeric variables.")
+        if st.sidebar.button('Plot correlation chart'):
+            fig = eda_plot.Corr(cols_list, correlation)
+            st.pyplot()
+            st.set_option('deprecation.showPyplotGlobalUse', False)
+            
+    if (menu =="Descriptive Statistics" ):
+        st.header("Descriptive Statisstics")
+        st.markdown("Provides summary statistics of only one variable in the dataset.")
+        main_var = st.selectbox("Choose one variable to analyze:", df.columns.insert(0,None))
 
-        st.sidebar.title('Lung Cancer Prediction')
+        if main_var in df.columns: 
+            if main_var != None:
+                st.subheader("Variable info")
+                st.table(pf_of_info(df, [main_var]).T)
+                st.subheader("Descriptive Statistics")
+                st.table((pd_of_stats(df, [main_var])).T)
+                
+                
+            
+def add_bg_from_local(image_file):
+    with open(image_file, "rb") as image_file:
+        encoded_string = pybase64.b64encode(image_file.read())
+    st.markdown(
+    f"""
+    <style>
+    .stApp {{
+        background-image: url(data:image/{"png"};pybase64,{encoded_string.decode()});
+        background-size: cover
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
+    )
+add_bg_from_local("C:/Users/DELL/Downloads/bg3.jpg")                    
         
-
-
 if __name__ == '__main__':
     main()
+
+'''hide_st_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_st_style, unsafe_allow_html=True)
+'''
